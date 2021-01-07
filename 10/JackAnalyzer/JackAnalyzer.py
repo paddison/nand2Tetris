@@ -11,6 +11,11 @@ tests = ["/home/padder/Documents/nand2tetris/projects/10/ArrayTest/Main.jack",
          "/home/padder/Documents/nand2tetris/projects/10/ExpressionLessSquare/Square.jack"]
 
 import JackTokenizer
+import re
 
 # Create a tokenizer from the Xxx.jack input file
 jt = JackTokenizer.JackTokenizer(tests[0])
+
+for token in jt.tokens:
+    tokentype = jt.tokentype(token)
+
