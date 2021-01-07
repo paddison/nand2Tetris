@@ -23,6 +23,12 @@ class JackTokenizer():
     # The token list
     tokens = []
 
+    # The current token
+    currentToken = ""
+
+    # Pointer for current token
+    tokenPointer = 0
+
     # # Regular expressions used for parsing
     matchKeywords = r'(' + r'|'.join(keywords) + r')(?=\W)'
     matchSymbols =  r'' + '\\' + '|\\'.join(symbols)
@@ -69,44 +75,56 @@ class JackTokenizer():
                 
                 for m in matches:
                     self.tokens.append(m.group(0))
+            
+        # Get the first token
+        self.currentToken = self.tokens[0]
+
+    # Do we have more tokens in the input?
+    def hasMoreTokens(self):
+        return self.tokenPointer >= len(self.tokens)
+
+    # Get the next token from the input and makes it the current token
+    def advance(self):
+        self.tokenPointer += 1
+        self.currentToken = self.tokens[self.tokenPointer]
 
     # Returns the type of the current token
-    def tokentype(self, token):
-        if token in self.keywords:
+    def tokenType(self):
+        if self.currentToken in self.keywords:
             return 'KEYWORD'
-        elif token in self.symbols:
+        elif self.currentToken in self.symbols:
             return 'SYMBOL'
-        elif re.match(self.matchIdentifier, token):
+        elif re.match(self.matchIdentifier, self.currentToken):
             return 'IDENTIFIER'
-        elif re.match(self.matchIntegerConstant, token):
+        elif re.match(self.matchIntegerConstant, self.currentToken):
             return 'INT_CONST'
-        elif re.match(self.matchStringConstant, token):
+        elif re.match(self.matchStringConstant, self.currentToken):
             return 'STRING_CONST'
         else:
             return 'INVALID TOKEN'
     
     # Returns the keyword which is the current token. 
     # Should be called only when tokenType() is KEYWORD.
-    def keyWord(self, token):
-        return token.upper()
+    def keyWord(self):
+        return '<keyword> ' + self.currentToken + ' </keyword>'
 
     # Returns the character which is the current token.
     # Should be called only when tokenType() is SYMBOL.
-    def symbol(self, token):
-        return token
+    def symbol(self):
+        return '<symbol> ' + self.currentToken + ' </symbol>'
     
     # Returns the identifier which is the current token. 
     # Should be called only when tokenType() is IDENTIFIER.
-    def identifier(self, token):
-        return token
+    def identifier(self):
+        return '<identifier> ' + self.currentToken + ' </identifier>'
 
     # Returns the integer value of the current token. 
     # Should be called only when tokenType() is INT_CONST.
-    def intVal(self, token):
-        return int(token)
+    def intVal(self):
+        return '<integerConstant> ' + self.currentToken + ' </integerConstant>'
 
     # Returns the string value ofthe current token, without the double quotes.
     # Should be called only when tokenType() is STRING_CONST.
     def stringVal(self, token):
-        return token[1:-1]
+        return '<stringConstant> ' + self.currentToken[1:-1] + ' </stringConstant>'
 
