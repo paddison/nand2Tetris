@@ -1,15 +1,37 @@
+import re
+
 
 class JackTokenizer():
     
-    
+    # The list containing all the keywords
+    keywords = ['class', 'constructor', 'function', 'method',   # subroutines
+                'field', 'static', 'var',                       # variable types
+                'int', 'char', 'boolean', 'void',               # primitive types  
+                'true', 'false', 'null'                         # booleans & null
+                'this', 'let', 'do',                            # keywords
+                'if', 'else', 'while', 'return']                # program flow control                      
+
+    # The list containing all the symbols
+    symbols = ['{', '}', '(', ')', '[', ']', 
+              '.', ',', ';', '+', '-', '*', 
+              '/', '&', '|', '<', '>', '=', '~']
+
+    # The token list
+    tokens = []
+
+    # # Regular expressions used for parsing
+    matchKeywords = r'(' + r'|'.join(keywords) + r')(?=\W)'
+    matchSymbols =  r'' + '\\' + '|\\'.join(symbols)
+    matchIntegerConstant = r'[0-9]+(?=[^0-9])'
+    matchStringConstant = r'\".*\"'
+    matchIdentifier = r'[a-zA-Z]\w*(?=\W)'
 
     # Opens the input file and tokenizes it
     def __init__(self, fname):
-        tokens = []
         with open(fname) as f:
+            # Boolean to help finding multiline comments
             multilineComment = False
-            
-            # No for loop because it's easier to remove multiline comments that way
+
             for line in f:
 
                 # Check if this line is part of a multiline comment
@@ -34,15 +56,14 @@ class JackTokenizer():
                         multilineComment = True
                         continue
                 
-                # Split the line into single words
-                words = line.split(" ")
-
-                # A boolean to help with parsing string constants
-                stringConstant = False
-                for word in words:
-                    if word == 'class':
-                        tokens.append(word)
-                    word = word.lstrip()
-                    print(word)
+                # Match tokens against re
+                matches = re.finditer(self.matchKeywords + '|' 
+                                          + self.matchIntegerConstant + '|' 
+                                          + self.matchIdentifier + '|' 
+                                          + self.matchStringConstant + '|'
+                                          + self.matchSymbols, line)
                 
-                # print(line,"")
+                for m in matches:
+                    self.tokens.append(m.group(0))
+            
+            print(self.tokens)
