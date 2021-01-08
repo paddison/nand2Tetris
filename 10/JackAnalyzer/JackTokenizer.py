@@ -20,13 +20,19 @@ class JackTokenizer():
               '.', ',', ';', '+', '-', '*', 
               '/', '&', '|', '<', '>', '=', '~']
 
-    # The token list
-    tokens = []
+    # A list containg all binary operators
+    operators = ['+', '-', '*', '/', '&', '|', '<', '>', '=', '~']
 
-    # The current token
-    currentToken = ""
+    # A list containing all unary operators
+    unaryOperators = ['-', '~']
 
-    # Pointer for current token
+    # A list containing all statements
+    statements = ['let', 'if', 'while', 'do', 'return']
+
+    # A list containing all keyword constants
+    keywordConstants = ['true', 'false', 'null', 'this']
+
+    
     tokenPointer = 0
 
     # # Regular expressions used for parsing
@@ -38,6 +44,11 @@ class JackTokenizer():
 
     # Opens the input file and tokenizes it
     def __init__(self, fname):
+        # Initialize the token list
+        self.tokens = []
+
+        # Initialize the pointer for the current token to 0
+        self.tokenPointer = 0
         with open(fname) as f:
             # Boolean to help finding multiline comments
             multilineComment = False
@@ -75,18 +86,20 @@ class JackTokenizer():
                 
                 for m in matches:
                     self.tokens.append(m.group(0))
-            
-        # Get the first token
-        self.currentToken = self.tokens[0]
+                
+        # Set the first token to the current token
+        self.currentToken = self.tokens[self.tokenPointer]
 
     # Do we have more tokens in the input?
     def hasMoreTokens(self):
-        return self.tokenPointer >= len(self.tokens)
+        return self.tokenPointer < len(self.tokens)
 
     # Get the next token from the input and makes it the current token
     def advance(self):
         self.tokenPointer += 1
-        self.currentToken = self.tokens[self.tokenPointer]
+        if (self.hasMoreTokens()):  
+            self.currentToken = self.tokens[self.tokenPointer]
+        return
 
     # Returns the type of the current token
     def tokenType(self):
@@ -103,28 +116,45 @@ class JackTokenizer():
         else:
             return 'INVALID TOKEN'
     
-    # Returns the keyword which is the current token. 
+    # Returns the keyword which is the current token, and advances the input. 
     # Should be called only when tokenType() is KEYWORD.
     def keyWord(self):
-        return '<keyword> ' + self.currentToken + ' </keyword>'
+        cur = self.currentToken
+        self.advance()
+        return '<keyword> ' + cur + ' </keyword>'
 
-    # Returns the character which is the current token.
+    # Returns the character which is the current token, and advances the input.
     # Should be called only when tokenType() is SYMBOL.
     def symbol(self):
-        return '<symbol> ' + self.currentToken + ' </symbol>'
+        if self.currentToken == '<':
+            cur = '&lt;'
+        elif self.currentToken == '&':
+            cur = '&amp;'
+        elif self.currentToken == '>':
+            cur = '&gt;'
+        else:
+            cur = self.currentToken
+        self.advance()
+        return '<symbol> ' + cur + ' </symbol>'
     
-    # Returns the identifier which is the current token. 
+    # Returns the identifier which is the current token, and advances the input. 
     # Should be called only when tokenType() is IDENTIFIER.
     def identifier(self):
-        return '<identifier> ' + self.currentToken + ' </identifier>'
+        cur = self.currentToken
+        self.advance()
+        return '<identifier> ' + cur + ' </identifier>'
 
-    # Returns the integer value of the current token. 
+    # Returns the integer value of the current token, and advances the input. 
     # Should be called only when tokenType() is INT_CONST.
     def intVal(self):
-        return '<integerConstant> ' + self.currentToken + ' </integerConstant>'
+        cur = self.currentToken
+        self.advance()
+        return '<integerConstant> ' + cur + ' </integerConstant>'
 
-    # Returns the string value ofthe current token, without the double quotes.
+    # Returns the string value ofthe current token, without the double quotes, and advances the input.
     # Should be called only when tokenType() is STRING_CONST.
-    def stringVal(self, token):
-        return '<stringConstant> ' + self.currentToken[1:-1] + ' </stringConstant>'
+    def stringVal(self):
+        cur = self.currentToken[1:-1]
+        self.advance()
+        return '<stringConstant> ' + cur + ' </stringConstant>'
 

@@ -6,22 +6,62 @@ For each source Xxx.jack file, the analyzer goes through the logic
 as described below
 """
 
-#FOR TESTING
-tests = ["/home/padder/Documents/nand2tetris/projects/10/ArrayTest/Main.jack",
-         "/home/padder/Documents/nand2tetris/projects/10/ExpressionLessSquare/Square.jack"]
-
 import JackTokenizer
 import CompilationEngine
-import re
+import sys
+import os
 
-# Create a tokenizer from the Xxx.jack input file
-jt = JackTokenizer.JackTokenizer(tests[1])
-print(jt.currentToken)
+if len(sys.argv) != 2:
+    print('Usage: python3 JackAnalyzer.py file/directory.')
+    exit()
 
-# Create the output with the compilation engine
-ce = CompilationEngine.CompilationEngine(jt)
+path = sys.argv[1]
+files = []
+# A single file as input
+if (path[-5:] == '.jack'):
+    f = path.rsplit('/', 1)[1]
+    files.append(f)
+    path = path.rsplit('/', 1)[0] + '/'
 
-for line in ce.out:
-    print(line)
+# Parse whole directory
+else:
+    if not path.endswith('/'):
+        path += '/'
+    directory = os.listdir(path)
+    
+    # Get all .jack files
+    for f in directory:
+        if f[-5:] == '.jack':
+            files.append(f)
 
+    # If no files were found, print an error
+    if len(files) == 0:
+        print('ERROR: No *jack files found in directory.')
+        exit()
 
+for f in files:
+    print('Parsing: ' + f)
+    # Create a tokenizer from the current Xxx.jack input file
+    jt = JackTokenizer.JackTokenizer(path + f)
+
+    # Create the output with the compilation engine
+    ce = CompilationEngine.CompilationEngine(jt)
+
+    # open a new file from path and filename (without .jack ending)
+    out = open(path + f[:-5] + '_out' + '.xml', 'w')
+    
+    # Write the xml file and take care of indentation
+    xmlSpace = ""
+    for line in ce.out:
+        if line.find('</') == 0:
+            xmlSpace = xmlSpace[:-2]
+        
+        # Write to the output file
+        out.write(xmlSpace + line + '\n')
+        if not line.startswith('</') and line.find('</') == - 1:
+            xmlSpace = xmlSpace + "  "
+    
+    out.close()
+
+print('\nComplete.')
+print('Goodbye!')
