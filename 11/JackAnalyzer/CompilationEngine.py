@@ -514,14 +514,9 @@ class CompilationEngine:
             string = self.jt.stringVal()
             self.writer.writePush('constant', len(string)) # Store string in temp 1 while it is created
             self.writer.writeCall('String.new', 1)
-            self.writer.writePop('temp', 1)
             for char in string: # Append each character to temporary string
-                self.writer.writePush('temp', 1) 
                 self.writer.writePush('constant', ord(char))
                 self.writer.writeCall('String.appendChar', 2)
-                self.writer.writePop('temp', 2)
-            self.writer.writePush('temp', 1)
-
         
         # keywordConstant
         elif self.jt.currentToken in self.jt.keywordConstants:
