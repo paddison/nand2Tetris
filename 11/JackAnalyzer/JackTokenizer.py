@@ -78,7 +78,7 @@ class JackTokenizer():
                 line = line[:line.find('//')]
 
                 # Filter multiline comments
-                if line.startswith('/**'):
+                if line.startswith('/*'):
                     if (line.find('*/') != -1):
                         continue
                     else:

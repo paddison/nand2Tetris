@@ -622,7 +622,7 @@ class CompilationEngine:
             if keyWord == 'TRUE':
                 self.writer.writePush('constant', 1)
                 self.writer.writeArithmetic('NEG')
-            if keyWord == 'FALSE' or keyWord == 'NULL':
+            elif keyWord == 'FALSE' or keyWord == 'NULL':
                 self.writer.writePush('constant', 0)
             else:
                 # 'this' is always pointer 0, since it stores the adress of the object in the heap
