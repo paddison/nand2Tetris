@@ -47,21 +47,5 @@ for f in files:
     # Create the output with the compilation engine
     ce = CompilationEngine.CompilationEngine(jt, path + f[:-5])
 
-    # open a new file from path and filename (without .jack ending)
-    out = open(path + f[:-5] + '_out' + '.xml', 'w')
-    
-    # Write the xml file and take care of indentation
-    xmlSpace = ""
-    for line in ce.out:
-        if line.find('</') == 0:
-            xmlSpace = xmlSpace[:-2]
-        
-        # Write to the output file
-        out.write(xmlSpace + line + '\n')
-        if not line.startswith('</') and line.find('</') == - 1:
-            xmlSpace = xmlSpace + "  "
-    
-    out.close()
-
 print('\nComplete.')
 print('Goodbye!')

@@ -7,24 +7,29 @@ The symbol table has two nested scopes (class/subroutine)
 """
 
 class SymbolTable:
-
-    # Initializes itself at the start of compiling a new class
+ 
     def __init__(self):
+        """
+        Initializes itself at the start of compiling a new class.
+        """
         self.classScope = {}
         self.subroutineScope = {}
         self.staticCount = 0
         self.fieldCount = 0
         return
 
-    # Starts a new subroutine scope (resets the subroutine Table)
     def startSubroutine(self):
+        """
+        Starts a new subroutine scope (resets the subroutine Table).
+        """
         self.subroutineScope = {}
         self.localCount = 0
         self.argCount = 0
 
-    # Defines a new Table entry, depending on kind
     def define(self, name, varType, kind):
-
+        """
+        Defines a new Table entry, depending on kind.
+        """
         if (kind == 'STATIC'):
             self.classScope[name] = {
             'type': varType,
@@ -58,8 +63,10 @@ class SymbolTable:
         
         return
 
-    # Returns the number of variables of the given kind already defined in the current scope
     def varCount(self, kind):
+        """
+        Returns the number of variables of the given kind already defined in the current scope/
+        """
         if (kind == 'STATIC'):
             return self.staticCount
         elif (kind == 'FIELD'):
@@ -71,8 +78,10 @@ class SymbolTable:
         else:
             return -1
 
-    # Returns the kind of the named identifier in the current scope, returns -1 if none is found
     def kindOf(self, name):
+        """
+        Returns the kind of the named identifier in the current scope, returns -1 if none is found.
+        """
         try:
             var = self.subroutineScope[name]
             return var['kind']
@@ -83,8 +92,11 @@ class SymbolTable:
             except:
                 return 'NONE'
 
-    # Returns the type of the named identifer in the current scope
     def typeOf(self, name):
+        """
+        Returns the type of the named identifer in the current scope.
+        """
+        
         try:
             var = self.subroutineScope[name]
             return var['type']
@@ -95,8 +107,10 @@ class SymbolTable:
             except:
                 return -1
 
-    # Returns the index assigned to the named identifier
     def indexOf(self, name):
+        """
+        Returns the index assigned to the named identifier.
+        """
         try:
             var = self.subroutineScope[name]
             return var['index']
@@ -107,8 +121,10 @@ class SymbolTable:
             except:
                 return -1
 
-    # Return the whole Variable
     def getVariable(self, name):
+        """
+        Return the whole Variable.
+        """
         try:
             return self.subroutineScope[name]
         except:
@@ -116,24 +132,3 @@ class SymbolTable:
                 return self.classScope[name]
             except:
                 return -1
-
-
-        
-
-
-#
-#
-# FOR TESTING ONLY
-"""
-st = SymbolTable()
-
-st.startSubroutine()
-st.define('testClass', 'int', 'STATIC')
-st.define('testSub', 'int', 'VAR')
-st.kindOf('testClass')
-st.kindOf('testSub')
-st.typeOf('testClass')
-st.typeOf('testSub')
-st.indexOf('testClass')
-st.indexOf('testSub')
-"""

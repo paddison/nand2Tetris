@@ -2,7 +2,6 @@ class VMWriter:
     def __init__(self, fname):
         self.f = open(fname + '.vm', 'w')
 
-    # field not implemented
     def writePush(self, segment, index):
         segment = self.getSegment(segment)
         self.f.write('push ' + segment + ' ' + str(index) + '\n')

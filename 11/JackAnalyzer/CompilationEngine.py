@@ -5,13 +5,19 @@ I did not implement error checking, so I assume the input is correct.
 
 import SymbolTable
 import VMWriter
+import CompilationErrors as ce
 
 class CompilationEngine:
 
-    # Initialize it with a tokenizer, who will guide the input, where each line will first be stored in a list called out.
     def __init__(self, tokenizer, fname):
+        """
+        Initialize it with a tokenizer, which will guide the input.
+
+        The output file will be written by calls to the VMWriter.
+
+        Also initialize all label counters to 0, and create a new class level symbol table.
+        """
         self.jt = tokenizer
-        self.out = []
         self.writer = VMWriter.VMWriter(fname)
         # Initialize lables for this class
         self.labels = {
@@ -19,23 +25,30 @@ class CompilationEngine:
             'IF': 0
         }
 
-        # initialize a new symbol table
+        # Initialize a new symbol table
         self.st = SymbolTable.SymbolTable()
         self.compileClass()
+
+        return
         
-
-    # Compiles a complete class according to the following grammar:
-    # 'class' className '{' classVarDec* subroutineDec* '}'
     def compileClass(self):
-
-        # 'class' TODO errorChecking
-        self.jt.keyWord()
+        """
+        Compiles a complete class according to the following grammar:
+            'class' className '{' classVarDec* subroutineDec* '}'
+        """
+        # 'class'
+        if self.jt.keyWord() != 'CLASS':
+            ce.classDeclarationError(self.jt.getCurrentLine())
 
         # className identifier
+        if self.jt.tokenType() != 'IDENTIFIER':
+            ce.classDeclarationError(self.jt.getCurrentLine())
+
         self.className = self.jt.identifier()
 
-        #'{' TODO errorChecking
-        self.jt.symbol()
+        #'{' 
+        if self.jt.symbol() != '{':
+            ce.missingBracketError(self.jt.getCurrentLine())
 
         # classVarDec*
         self.compileClassVarDec()
@@ -44,20 +57,15 @@ class CompilationEngine:
         self.compileSubroutine()
 
         # '}'
-        self.out.append(self.jt.symbol())
-        self.out.append('</class>')
+        if self.jt.symbol() != '}':
+            ce.missingBracketError(self.jt.getCurrentLine())
         return
 
-    # Compiles zero or more static or field declarations according to the following grammar:
-    # ('static' | 'field') type varName (',' varName)* ';'
     def compileClassVarDec(self):
-        """ Compiles zero or more static or field declarations by adding them to the Symbol Table.
-
+        """ 
+        Compiles zero or more static or field declarations by adding them to the Symbol Table.
             Grammar: ('static' | 'field') type varName (',' varName)* ';'
-           
         """
-
-
         while self.jt.currentToken == 'static' or self.jt.currentToken == 'field':
 
             # ('static' | 'field')
@@ -65,6 +73,8 @@ class CompilationEngine:
             
             # type 
             varType = self.jt.currentToken
+            if not self.checkVarType():
+                ce.invalidVarTypeError(varType, self.jt.getCurrentLine())
             self.jt.advance()
             
             # varName
@@ -81,17 +91,21 @@ class CompilationEngine:
                 # Add it to the Symbol Table
                 self.st.define(varName, varType, varKind)
                 
-            # ';' TODO errorChecking
-            self.out.append(self.jt.symbol())
+            # ';'
+            if self.jt.symbol() != ';':
+                ce.missingTerminationError(self.jt.getCurrentLine())
+
+        # if trying to declare invalid variable kind
+        if self.jt.currentToken == 'var':
+            ce.invalidVarKindError(self.jt.currentToken, 'class variable space', self.jt.getCurrentLine())
 
         return
 
-    # Compiles zero or more subroutines according to the following grammar:
-    # ('constructor' | 'function' | 'method')('void' | type) subroutineName '(' parameterList ')' subroutineBody
     def compileSubroutine(self):
-        
-        
-
+        """
+        Compiles zero or more subroutines according to the following grammar:
+            ('constructor' | 'function' | 'method')('void' | type) subroutineName '(' parameterList ')' subroutineBody
+        """
         while (self.jt.currentToken == 'constructor' or 
                self.jt.currentToken == 'function' or 
                self.jt.currentToken == 'method'):
@@ -100,9 +114,8 @@ class CompilationEngine:
             self.st.startSubroutine()
             
             # ('constructor' | 'function' | 'method')
-            subroutineType = self.jt.keyWord()
-
-            
+            self.currentSubroutineType = self.jt.keyWord()
+  
             # ('void' | type) get return type for this subroutine
             if self.jt.tokenType() == 'IDENTIFIER':
                 self.returnType = self.jt.identifier()
@@ -112,56 +125,65 @@ class CompilationEngine:
             # subroutineName
             subroutineName = self.jt.identifier()
             
-            # '(' TODO errorcheck Parameter
-            self.jt.symbol()
+            # '(' 
+            if self.jt.currentToken != '(':
+                ce.missingBracketError(self.jt.getCurrentLine())
+            self.jt.advance()
             
             # If the current subroutine is a method, the current object MUST be first argument added to the symbol table
-            if subroutineType == 'METHOD':
+            if self.currentSubroutineType == 'METHOD':
                 self.st.define('this', self.className, 'ARG')
 
             # adds arguments to SubroutineTable
             self.compileParameterList() #DONE
 
-            # ')' TODO errorChecking
-            self.jt.symbol()
+            # ')'
+            if self.jt.currentToken != ')':
+                ce.missingBracketError(self.jt.getCurrentLine())
+            self.jt.advance()
             
             # Compile the body of a subroutine
             
-            # '{' TODO errorChecking
-            self.jt.symbol()
+            # '{' 
+            if self.jt.currentToken != '{':
+                ce.missingBracketError(self.jt.getCurrentLine())
+            self.jt.advance()
             
             # Add local variables to Subroutine Table
-            self.compileVarDec() #DONE
+            self.compileVarDec() 
 
             # Get number of local variables and write function declaration (function Class.subroutineName numLocals) 
             numLocals = self.st.varCount('VAR')
             self.writer.writeFunction(self.className + '.' + subroutineName, numLocals)
 
-            # If the current function is a constructor, allocate space for it and set the pointer segment to point to said space
+            # If the current function is a constructor, allocate space for object and set the pointer segment to point to said obejct
             # The space needed will be the number of field variables
-            if subroutineType == 'CONSTRUCTOR':
+            if self.currentSubroutineType == 'CONSTRUCTOR':
                 self.writer.writePush('constant', self.st.varCount('FIELD'))
                 self.writer.writeCall('Memory.alloc', 1)
-                self.writer.writePop('pointer', 0)
+                self.writer.writePop('pointer', 0) # setting 'this'
+
             # If the current function is a method, we must set the this segment/current object first.
-            # In a method call the first argument will ALWAYS be the current object. Which we need to set the this segment to.
-            elif subroutineType == 'METHOD':
+            # In a method call the first argument will ALWAYS be the current object.
+            elif self.currentSubroutineType == 'METHOD':
                 self.writer.writePush('argument', 0)
-                self.writer.writePop('pointer', 0)
+                self.writer.writePop('pointer', 0) # setting 'this'
 
             # statements
             self.compileStatements() 
             
             # '}'
-            self.out.append(self.jt.symbol())
+            if self.jt.currentToken != '}':
+                ce.missingBracketError(self.jt.getCurrentLine())
+            self.jt.advance()
 
-            self.out.append('</subroutineBody>')
-            self.out.append('</subroutineDec>')
         return
 
-    # Adds the ARG variabls of a subroutine declaration to the symbol table
     def compileParameterList(self):
-
+        """
+        Adds the ARG variabls of a subroutine declaration to the symbol table, according to the following grammar:
+            ((type varName) (',' type varName)*)?
+        """
         # Are there any arguments?
         if (self.jt.currentToken == 'int' or self.jt.currentToken == 'char' or
             self.jt.currentToken == 'boolean' or self.jt.tokenType() == 'IDENTIFIER'):
@@ -171,6 +193,10 @@ class CompilationEngine:
                 varType = self.jt.keyWord()
             else:
                 varType = self.jt.identifier()
+
+            # error checking variable type
+            if not self.checkVarType():
+                ce.invalidVarTypeError(varType, self.jt.getCurrentLine())
 
             name = self.jt.identifier()
             
@@ -186,6 +212,10 @@ class CompilationEngine:
                 else:
                     varType = self.jt.identifier()
 
+                # error checking variable type
+                if not self.checkVarType():
+                    ce.invalidVarTypeError(varType, self.jt.getCurrentLine())
+
                 name = self.jt.identifier()
                 
                 # add entry to symbol table
@@ -193,10 +223,11 @@ class CompilationEngine:
 
         return
 
-    # Compiles zero or more var declarations according to the following grammar:
-    # 'var' type varName (',' varName)* ';'
     def compileVarDec(self):
-
+        """
+        Compiles zero or more var declarations according to the following grammar:
+            'var' type varName (',' varName)* ';'
+        """
         # Are there any var tokens left?
         while (self.jt.currentToken == 'var'):
 
@@ -210,6 +241,10 @@ class CompilationEngine:
             else:
                 varType = self.jt.identifier()
 
+            # error checking variable type
+            if not self.checkVarType():
+                ce.invalidVarTypeError(varType, self.jt.getCurrentLine())
+
             #varName
             name = self.jt.identifier()
 
@@ -222,16 +257,23 @@ class CompilationEngine:
                 name = self.jt.identifier()
                 self.st.define(name, varType, kind)
 
-            # ';' TODO errorChecking
-            self.jt.symbol()
+            # ';' 
+            if self.jt.currentToken != ';':
+                ce.missingTerminationError(self.jt.getCurrentLine())
+            self.jt.advance()
+
+        # if trying to declare invalid variable kind
+        if self.jt.currentToken == 'static' or self.jt.currentToken == 'field':
+            ce.invalidVarKindError(self.jt.currentToken, 'local space', self.jt.getCurrentLine())
+
         return
 
-    # Compiles a sequence of statements according to the follwoing grammar:
-    # statement* (let | if | while | do | return)
     def compileStatements(self):
-        self.out.append('<statements>')
-
-        # Are there any statements? #NONE DONE SO FAR #TODO errorChecking
+        """
+        Compiles a sequence of statements according to the follwoing grammar:
+            statement* (let | if | while | do | return)
+        """
+        # Are there any statements? 
         while self.jt.currentToken in self.jt.statements:
             if self.jt.currentToken == 'let':
                 self.jt.advance()
@@ -248,33 +290,39 @@ class CompilationEngine:
             elif self.jt.currentToken == 'return': 
                 self.jt.advance()
                 self.compileReturn()
-        self.out.append('</statements>')
         return
 
-    # Compiles a do statement according to the following grammar:
-    # 'do' subroutineCall ';'
-    def compileDo(self):
 
+    def compileDo(self):
+        """
+        Compiles a do statement according to the following grammar:
+            'do' subroutineCall ';'
+        """
         # subroutineCall
         self.compileSubroutineCall(self.jt.identifier())
 
-        # A function call with do will always be void, which by convention return 0
+        # A do function call will always be void, which by convention return 0
         # They need to be 'dumped' in the temp memory segment
-
         self.writer.writePop('temp', 0)
 
-        # ';' #TODO errorChecking
-        self.jt.symbol()
+        # ';'
+        if self.jt.currentToken != ';':
+            ce.missingTerminationError(self.jt.getCurrentLine())
+        self.jt.advance()
+        
         return
 
-    # Compiles a let statement according to the following grammar:
-    # 'let' varName ('[' expression ']')? '=' expression ';'
     def compileLet(self):
-        
+        """
+        Compiles a let statement according to the following grammar:
+            'let' varName ('[' expression ']')? '=' expression ';'
+        """
         # varName, get current variable from symbolTable
-        var = self.st.getVariable(self.jt.identifier())
-        
+        varName = self.jt.identifier()
+        var = self.st.getVariable(varName)
 
+        if var == -1:
+            ce.variableNotFoundError(varName, self.jt.getCurrentLine())
 
         # ('[' expression ']')? 
         if self.jt.currentToken == '[':
@@ -287,26 +335,35 @@ class CompilationEngine:
             # expression
             self.compileExpression()
 
-            # Calculate the index (baseAdress + expression)
+            # Calculate the index (baseAdress + expression) and put it on top of stack
             self.writer.writeArithmetic('ADD')
 
-            # ']' TODO errorChecking
-            self.out.append(self.jt.symbol())
+            # ']' 
+            if self.jt.currentToken != ']':
+                ce.missingBracketError(self.jt.getCurrentLine())
+            self.jt.advance()
 
-            # = TODO errorChecking
-            self.out.append(self.jt.symbol())
+            # '=' 
+            if self.jt.currentToken != '=':
+                ce.missingEqualsError(self.jt.getCurrentLine())
+            self.jt.advance()
 
             # expression
             self.compileExpression()
 
+            # After compiling the expression the top value on stack will be the return value which will be stored in temp 0
+            # The next value on the stack is the adress of the index, which will be popped in pointer 1, to set the 'that' segment
+            # Afterwards save the value of temp 0 in the adress of that
             self.writer.writePop('temp', 0)
             self.writer.writePop('pointer', 1)
             self.writer.writePush('temp', 0)
             self.writer.writePop('that', 0)
 
         else:
-            # = TODO errorChecking
-            self.out.append(self.jt.symbol())
+            # '= '
+            if self.jt.currentToken != '=':
+                ce.missingEqualsError(self.jt.getCurrentLine())
+            self.jt.advance()
 
             # expression
             self.compileExpression()
@@ -314,16 +371,31 @@ class CompilationEngine:
             # Pop expression result into variable
             self.writer.writePop(var['kind'], var['index'])
 
-        # ';' #TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # ';'
+        if self.jt.currentToken != ';':
+            ce.missingTerminationError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         return
 
-    # Compiles a while statement according to the following grammar:
-    # 'while' '(' expression ')' '{' statements '}'
-    def compileWhile(self):        
+    def compileWhile(self):     
+        """
+        Compiles a while statement according to the following grammar:
+            'while' '(' expression ')' '{' statements '}'
         
-        # 'while' Done before function call
+        When writing a while statement we must evaluate the condition first and then negate it.
+        If it is true (meaning the actual condition is false) we go to the exit label. 
+        Otherwise continue in the loop, go to top, and repeat.
+
+        The general VM code will look like:
+            label className_WHILEx
+            VM code for computing ~(cond)
+            if-goto className_WHILEx_EXIT
+            VM code for loop statements
+            goto className_WHILEx
+            label className_WHILEx_EXIT
+        """   
+        # 'while' tokenpointer advanced before function call
         
         # Create label for entering while loop
         label = self.createLabel('WHILE')
@@ -332,28 +404,36 @@ class CompilationEngine:
 
         self.writer.writeLabel(label)
         
-        # '(' TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # '(' 
+        if self.jt.currentToken != '(':
+            ce.missingBracketError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # expression
         self.compileExpression()
 
-        # ')' TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # ')'
+        if self.jt.currentToken != ')':
+            ce.missingBracketError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # negate the expression
         self.writer.writeArithmetic('NOT')
         # if true (meaning the condition evaluated to false) goto exit label
         self.writer.writeIf(label + '_EXIT')
 
-        # '{' TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # '{'
+        if self.jt.currentToken != '{':
+            ce.missingBracketError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # statements
         self.compileStatements()
 
-        # '}' TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # '}'
+        if self.jt.currentToken != '}':
+            ce.missingBracketError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # at the end of statements, go back to beginning
         self.writer.writeGoto(label)
@@ -363,19 +443,24 @@ class CompilationEngine:
 
         return
 
-    # compiles a return statement according to the following grammar:
-    # 'return' expression? ';'
     def compileReturn(self):
+        """
+        compiles a return statement according to the following grammar:
+            'return' expression? ';'
+        A return statement must always have a value pushed on the stack before executed. 
+        If the current function is void, constant 0 will be pushed before return.
+        """
         
-        # 'return' Done before function Call
+        # 'return' tokenPointer advanced before function call.
 
         # expression?
         if self.jt.currentToken != ';':
             self.compileExpression()
 
         # ';'
-        self.out.append(self.jt.symbol())
-        self.out.append('</returnStatement>')
+        if self.jt.currentToken != ';':
+            ce.missingBracketError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # if current subroutine is of return type 'void', push 0 before return
         if (self.returnType == 'VOID'):
@@ -384,40 +469,42 @@ class CompilationEngine:
         self.writer.writeReturn()
         return
 
-
     def compileIf(self):
-        """ Compiles an if statement.
+        """ 
+        Compiles an if statement according to the following grammar.
+            'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?
+    
+        When compiling an if statement, we must first evaluate the condition, and negate it.
+        If it is true, it means the if was false and we goto the else part of it otherwise continue with the flow of the code, 
+        and jump to the exit label.
 
-            Grammar: 'if' '(' expression ')' '{' statements '}' ('else' '{' statements '}')?
-        
-            When compiling an if statement, we must first evaluate the condition, and negate it.
-            If it is true, it means the if was false and we goto the else part of it otherwise continue with the flow of the code, 
-            and jump to the exit label.
-
-            The general VM-Code will look like:
-                VM code for computing ~(cond)    
-                if-goto className_IFCount    
-                VM code for executing the 'if' part   
-                goto className_IFCount_EXIT
-                label className_IFCount    
-                VM code for executing the 'else' part  
-                label className_IFCount_EXIT
+        The general VM-Code will look like:
+            VM code for computing ~(cond)    
+            if-goto className_IFCount    
+            VM code for executing the 'if' part   
+            goto className_IFCount_EXIT
+            label className_IFCount    
+            VM code for executing the 'else' part  
+            label className_IFCount_EXIT
         """
-
         # 'if' handled before function call
         label = self.createLabel('IF')
         
         # increment if label counter
         self.labels['IF'] += 1
 
-        # '(' TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # '(' 
+        if self.jt.currentToken != '(':
+            ce.missingBracketError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # expression
         self.compileExpression()
 
-        # ')' TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # ')'
+        if self.jt.currentToken != ')':
+            ce.missingBracketError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # Negate the expression
         self.writer.writeArithmetic('NOT')
@@ -425,14 +512,18 @@ class CompilationEngine:
         # write if-goto for else
         self.writer.writeIf(label + '_ELSE')
 
-        # '{' TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # '{'
+        if self.jt.currentToken != '{':
+            ce.missingBracketError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # statements for if part
         self.compileStatements()
 
-        # '}' TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # '}'
+        if self.jt.currentToken != '}':
+            ce.missingBracketError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # after code execution go to end of if else
         self.writer.writeGoto(label + '_EXIT')
@@ -443,26 +534,34 @@ class CompilationEngine:
         # ('else' '{' statements '}')?
         if self.jt.currentToken == 'else':
             # 'else'
-            self.out.append(self.jt.keyWord())
+            self.jt.advance()
 
             # '{'
-            self.out.append(self.jt.symbol())
+            if self.jt.currentToken != '{':
+                ce.missingBracketError(self.jt.getCurrentLine())
+            self.jt.advance()
 
             # statements
             self.compileStatements()
 
             # '}'
-            self.out.append(self.jt.symbol())
+            if self.jt.currentToken != '}':
+                ce.missingBracketError(self.jt.getCurrentLine())
+            self.jt.advance()
 
-        # write exit label for if
+        # write exit label for if statement
         self.writer.writeLabel(label + '_EXIT')
 
         return
 
-    # Compiles an expression according to the following grammar:
-    # term (op term)*
     def compileExpression(self):
-        
+        """
+        Compiles an expression according to the following grammar:
+            term (op term)*
+        Luckily since terms are compiled recursively, we don't need to worry about the order.
+        If there is a operator, the arithmetic operation must always be evaluated after the term compilation itself
+        (e.g. term1, term2, add)
+        """
         # term
         self.compileTerm()
         
@@ -495,15 +594,14 @@ class CompilationEngine:
                 self.writer.writeArithmetic('AND')
             elif (op == '|'):
                 self.writer.writeArithmetic('OR')
-            else:
-                pass#TODO errorChecking
 
         return
 
-    # Compiles a term according to the following grammar:
-    # integerConstant | stringConstant | keywordConstant | varName | varName '[' expression ']' | subroutineCall | '(' expression ')' | unaryOp term
     def compileTerm(self):
-        self.out.append('<term>')
+        """
+        Compiles a term according to the following grammar:
+            integerConstant | stringConstant | keywordConstant | varName | varName '[' expression ']' | subroutineCall | '(' expression ')' | unaryOp term
+        """
 
         # push constant
         if self.jt.tokenType() == 'INT_CONST':
@@ -528,12 +626,13 @@ class CompilationEngine:
                 self.writer.writePush('constant', 0)
             else:
                 # 'this' is always pointer 0, since it stores the adress of the object in the heap
+                if self.currentSubroutineType == 'FUNCTION':
+                    ce.wrongFunctionContext(self.jt.getCurrentLine())
                 self.writer.writePush('pointer', 0)
                 
-
         # varName | varName '[' expression ']' | subroutineCall
         elif self.jt.tokenType() == 'IDENTIFIER':
-            # Get varName from table, if no result is found, assume it is subroutine
+            # Get varName from table, if no result is found, assume it is function
             varName = self.jt.identifier()
             var = self.st.getVariable(varName)
             
@@ -548,19 +647,21 @@ class CompilationEngine:
                     self.writer.writePop('pointer', 1) # Set pointer to point to that adress
                     self.writer.writePush('that', 0) # Push the value at adress a[i] on stack
                     self.writer.writePop('temp', 0) # Temporarily store it in temp 0
-                    self.writer.writePush('temp', 0) # Push it on stack
+                    self.writer.writePush('temp', 0) # Push it on stack for return
 
-                    # TODO errorChecking
-                    self.out.append(self.jt.symbol())
+                    # ']'
+                    if self.jt.currentToken != ']':
+                        ce.missingBracketError(self.jt.getCurrentLine())
+                    self.jt.advance()
 
+                # if it is a method
                 elif self.jt.currentToken == '.':
                     self.compileSubroutineCall(varName)
                 else:
                     # Push variable on stack
                     self.writer.writePush(var['kind'], var['index'])
                 
-
-            # Handle it like a normal subroutine
+            # If it is a function or constructor
             else:
                 # subroutineCall
                 # '(' expressionList ')' | (className | varName).subroutineName'(' expressionList ')'
@@ -570,7 +671,9 @@ class CompilationEngine:
         elif self.jt.currentToken == '(':
             self.jt.advance()
             self.compileExpression()
-            self.jt.symbol() # TODO errorChecking
+            if self.jt.currentToken != ')':
+                ce.missingBracketError(self.jt.getCurrentLine())
+            self.jt.advance()
 
         # unaryOp term
         elif self.jt.currentToken in self.jt.unaryOperators:
@@ -600,32 +703,18 @@ class CompilationEngine:
             numExpressions += 1
             # (',' expression)*
             while self.jt.currentToken == ',':
-                self.jt.symbol() #TODO errorChecking
+                self.jt.advance()
                 # 'expression'
                 self.compileExpression()
                 numExpressions += 1
 
         return numExpressions
-
-    # A small helper to write the following grammar:
-    # type varName (used in compileParameterList, compileClassVarDec & compileVarDec)
-    def compileTypeVarName(self):
-        # type
-        varType = self.jt.currentToken
-        if self.jt.tokenType() == 'KEYWORD':    
-            self.out.append(self.jt.keyWord())
-        else:
-            self.out.append(self.jt.identifier())
-
-        #varName
-        name = self.jt.currentToken
-        self.out.append(self.jt.identifier())
-
-        return [varType, name]
-
-    # compiles a subroutineCall
-    # subroutineName '(' expressionList ')' | (className | varName).subroutineName'(' expressionList ')'
+  
     def compileSubroutineCall(self, subName):
+        """
+        A helper function to compile a subroutine call, must be called with name of the subroutine
+            Grammar: subroutineName '(' expressionList ')' | (className | varName).subroutineName'(' expressionList ')'
+        """
         # subroutineName | className | varName
         identifier = subName
         numArgs = 0
@@ -636,10 +725,11 @@ class CompilationEngine:
             # see if it is a method call, by checking if identifier is in symbol table
             varName = self.st.getVariable(identifier)
 
-            # If no variable was found, identifier is the name of a class, otherwise get class (type) of variable
+            # If no variable was found it means subroutine is a function, or constructor.
             if varName == -1:
                 className = identifier
-            else: #TODO errorChecking
+            else: 
+                # If a variable is found it means it is a method
                 className = varName['type']
                 # For method calls, the current variable needs to pushed before arguments, and numArgs = numArgs + 1
                 numArgs += 1
@@ -655,21 +745,38 @@ class CompilationEngine:
             numArgs += 1
             self.writer.writePush('pointer', 0) # the adress of the current object
         
-        # '(' TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # '('
+        if self.jt.currentToken != '(':
+            ce.missingParameterList(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # expressionList has to return number of expressions, will be number for function call
         numArgs += self.compileExpressionList()
 
-        # ')' TODO errorChecking
-        self.out.append(self.jt.symbol())
+        # ')'
+        if self.jt.currentToken != ')':
+            ce.missingBracketError(self.jt.getCurrentLine())
+        self.jt.advance()
 
         # write the call with className.subroutineName, numExpressions
         self.writer.writeCall(className + '.' + subroutineName, numArgs)
         
         return
 
-
-    # Labels are created like this className_labelNameCount
     def createLabel(self, name):
+        """
+        A helper to create labels. They are created with the following naming convention:
+            className_labelNameCounter(_additionalInfo)*
+        """
         return self.className + '_' + name + str(self.labels[name])
+
+    def checkVarType(self):
+        """
+        A helper to check if the variable is of a valid type. (Meaning not 'null' or 'this' etc)    
+        """
+        if (self.jt.tokenType() != 'KEYWORD' and self.jt.tokenType() != 'IDENTIFIER'):
+            return False
+        elif (self.jt.tokenType() == 'KEYWORD' and self.jt.currentToken not in self.jt.primitiveTypes):
+            return False
+        else:
+            return True
