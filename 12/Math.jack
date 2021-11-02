@@ -1,0 +1,165 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/12/Math.jack
+
+/**
+ * A library of commonly used mathematical functions.
+ * Note: Jack compilers implement multiplication and division using OS method calls.
+ */
+class Math {
+
+    static Array bitToNum;
+    static int divisionProduct;
+
+    /** Initializes the library. */
+    function void init() {
+
+        // Initialize the bitToNum Array, which is used for bitwise operations. 
+        let bitToNum = Array.new(16);
+        let bitToNum[0] = 1;
+        let bitToNum[1] = 2;
+        let bitToNum[2] = 4;
+        let bitToNum[3] = 8;
+        let bitToNum[4] = 16;
+        let bitToNum[5] = 32;
+        let bitToNum[6] = 64;
+        let bitToNum[7] = 128;
+        let bitToNum[8] = 256;
+        let bitToNum[9] = 512;
+        let bitToNum[10] = 1024;
+        let bitToNum[11] = 2048;
+        let bitToNum[12] = 4096;
+        let bitToNum[13] = 8192;
+        let bitToNum[14] = 16384;
+        let bitToNum[15] = 16384 + 16384;
+
+        return;
+    }
+
+    /** Returns the absolute value of x. */
+    function int abs(int x) {
+        if (x < 0){
+            return -x;
+        }else {
+            return x;
+        }
+    }
+
+    /** Returns the product of x and y. 
+     *  When a Jack compiler detects the multiplication operator '*' in the 
+     *  program's code, it handles it by invoking this method. In other words,
+     *  the Jack expressions x*y and multiply(x,y) return the same value.
+     */
+    function int multiply(int x, int y) {
+        var int sum;
+        var int shiftedX;
+        var int n;
+        var int max;
+        if ((x = 0) | (y = 0)) {
+            return 0;
+        }
+        let n = 0;
+        let sum = 0;
+        let shiftedX = x;
+        if (y < 0) { // if y is negative, the whole algorithm must run 16 times
+            let max = 16;
+        }else {
+            let max = 0; // if not, make it dependent on size of y, since n < max will now always be false
+        }
+        while ((n < max) | ((bitToNum[n] - 1) < y)) {
+            if (Math.bit(y, n)) {
+                let sum = sum + shiftedX;
+            }
+            let shiftedX = shiftedX + shiftedX;
+            let n = n + 1;
+        }
+        return sum;
+    }
+
+    /** Returns the integer part of x/y.
+     *  When a Jack compiler detects the multiplication operator '/' in the 
+     *  program's code, it handles it by invoking this method. In other words,
+     *  the Jack expressions x/y and divide(x,y) return the same value.
+     */
+    function int divide(int x, int y) {
+        var boolean neg; // to see if the result will be negative
+
+        let neg = false;
+
+        // get the absolute values of y and x, and set the result to right sign.
+        if (y < 0) {
+            let y = -y;
+            let neg = ~neg;
+        }
+        if (x < 0) {
+            let x = -x;
+            let neg = ~neg;
+        }
+        if (true = neg) {
+            return -Math.division(x, y);
+        }else {
+            return Math.division(x, y);
+        }
+    }
+
+    /** A helper for the division function, to use less local variables and less if conditions */
+    function int division(int x, int y) {
+        var int q;
+
+        // use a static variable to remember the result of the previous products, so less computation is needed
+        if ((y > x) | ((y + y) < 0)) {
+            let divisionProduct = 0;
+            return 0;
+        }
+        let q = Math.division(x, y + y);
+        if ((x - divisionProduct) < y){
+            return q + q;
+        }else {
+            let divisionProduct = divisionProduct + y;
+            return q + q + 1;
+        }
+    }
+
+    /** Returns the integer part of the square root of x. */
+    function int sqrt(int x) {
+        var int n;
+        var int y;
+        var int product;
+
+        // since all positive numbers are between 2^15 - 1 and 0, the maximal product can be 2^7 * 2^7
+        let n = 7;
+        let y = 0;
+        while (n > -1){
+            let product = (y + bitToNum[n]) * (y + bitToNum[n]);
+            if ((product > 0) & ((product < x) | (product = x))) {
+                let y = y + bitToNum[n];
+            }
+            let n = n - 1;
+        }
+        return y;
+    }
+
+    /** Returns the greater number. */
+    function int max(int a, int b) {
+        if (a > b){
+            return a;
+        }else {
+            return b;
+        }
+    }
+
+    /** Returns the smaller number. */
+    function int min(int a, int b) {
+                if (a < b){
+            return a;
+        }else {
+            return b;
+        }
+    }
+
+    /** Returns true, if the j-th bit of x is 1 */
+    function boolean bit(int x, int j) {
+        return ~((x & bitToNum[j]) = 0);
+    }
+}

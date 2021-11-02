@@ -1,0 +1,175 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/12/Memory.jack
+
+/**
+ * This library provides two services: direct access to the computer's main
+ * memory (RAM), and allocation and recycling of memory blocks. The Hack RAM
+ * consists of 32,768 words, each holding a 16-bit binary number. (2048-16383)
+ */ 
+class Memory {
+
+    static int freeList; 
+    static Array heap;
+    /** Initializes the class. */
+    function void init() {
+        let heap = 2048;
+        let freeList = 2048;
+        let heap[0] = null; // pointer to next segment
+        let heap[1] = 14335;  // length of the heap
+    
+        return;
+    }
+
+    /** Returns the RAM value at the given address. */
+    function int peek(int address) {
+        var Array memory;
+        let memory = 0;
+        return memory[address];
+    }
+
+    /** Sets the RAM value at the given address to the given value. */
+    function void poke(int address, int value) {
+        var Array memory;
+        let memory = 0;
+        let memory[address] = value;
+        return;
+    }
+
+    /** Finds an available RAM block of the given size and returns
+     *  a reference to its base address. */
+    
+    // First fit algorithm 
+    function int allocFirstFit(int size) {
+        var Array next, block, bestFit;
+        var boolean allocating;
+
+        let next = heap;
+        let allocating = true;
+        while(allocating) {
+            if (~(next = null)){
+                if(next[1] > (size + 2)){
+                // block will be cut off from bottom of heap, or block
+                    let block = next[1] + next - size - 2; // new segment will be at next + nextSize - (blocksize + 2) 
+                    let block[0] = null;
+                    let block[1] = size;
+                    let next[1] = next[1] - size - 2; // "cut" the block off, by adjusting the size of next
+                    let allocating = false;
+                }else {
+                    let next = next[0];
+                }
+            }else {
+                do Sys.error(1); // no block available
+                return -1;
+            }
+        }
+        return block + 2; // memory adress of start segment
+    }
+
+    // Best fit algorithm
+    function int alloc(int size) {
+        var Array next, block, bestFit;
+        var boolean allocating;
+
+        let next = heap;
+        let bestFit = heap;
+        let allocating = true;
+        while(allocating) {
+            if (~(next = null)){
+                if((next[1] > (size + 2)) & (next[1] < bestFit[1])){
+                    let bestFit = next;                                  
+                }
+                let next = next[0];              
+            }else {
+                let allocating = false;
+            }
+        }
+
+        if (bestFit[1] > (size + 2)) {
+            let block = bestFit[1] + bestFit - size - 2; // new segment will be at next + nextSize - (blocksize + 2) 
+            let block[0] = null;
+            let block[1] = size;
+            let bestFit[1] = bestFit[1] - size - 2; // "cut" the block off, by adjusting the size of next
+        }else {
+            do Sys.error(2);
+            return -1;
+        }
+
+        return block + 2; // memory adress of start segment
+    }
+
+    /** De-allocates the given object (cast as an array) by making
+     *  it available for future allocations. */
+    function void deAllocWithoutDefrag(Array o) {
+        var Array next;
+        var boolean deAllocating;
+        var int i;
+
+        // Setting all fields in o to 0
+        let i = 0;
+        while(i < o[-1]){   // size can be found one adress before
+            let o[i] = 0;
+            let i = i + 1;
+        } 
+
+        let next = heap;
+        let deAllocating = true;
+        while(deAllocating) {
+            if (next[0] = null) {
+                let next[0] = o;
+                let deAllocating = false;
+            }else {
+                let next = next[0];
+            }
+        }
+        return;
+    }   
+
+    // A deAlloc function that also defragments, by inserting the array back in the heap,
+    // and immediately creating a larger segment 
+    // Credits for this go to cadet1620 at his post http://nand2tetris-questions-and-answers-forum.32033.n3.nabble.com/New-Heap-Management-algorithm-Coursera-version-td4032026.html
+    function void deAlloc(Array o) {
+        var Array previousSegment, nextSegment, segment;
+        var boolean deAllocating;
+        var int i;
+
+        // Setting all fields in o to 0
+        let i = 0;
+        while(i < o[-1]){   // size can be found one adress before
+            let o[i] = 0;
+            let i = i + 1;
+        } 
+
+        let previousSegment = heap;
+        let nextSegment = heap[0]; // Address of next segment
+        let segment = o; // address of o 
+
+        // Find the best position for deAllocating
+        while ((~(nextSegment) = null) & (nextSegment < segment)) {
+            let previousSegment = nextSegment;
+            let nextSegment = previousSegment[0];
+        }
+
+        let previousSegment[0] = segment;
+        let segment[0] = nextSegment;
+
+        // See if it is contiguos with next segment
+        if ((segment + segment[1] + 2) = nextSegment){
+            let segment[1] = segment[1] + nextSegment[1] + 2;
+            let segment[0] = nextSegment[0];
+            let nextSegment[1] = 0; // set the "field" values of merged segment to 0
+            let nextSegment[0] = 0;
+        } 
+
+        // See if it is contiguous with previous segment
+        if ((previousSegment + previousSegment[1] + 2) = segment){
+            let previousSegment[1] = previousSegment[1] + segment[1] + 2;
+            let previousSegment[0] = segment[0];
+            let segment[1] = 0;
+            let segment[0] = 0;
+        } 
+        
+        return;
+    } 
+}
